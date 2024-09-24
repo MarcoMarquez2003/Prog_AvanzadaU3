@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        input {
+            background-color: gray;
+            color: white;
+        }
+        .welcome-page {
+            text-align: center;
+            margin-top: 50px;
+        }
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 80%;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        .actions button {
+            margin: 0 5px;
+            padding: 5px 10px;
+        }
+        .edit-form {
+            margin: 20px auto;
+            width: 50%;
+            padding: 20px;
+            border: 1px solid black;
+            background-color: #f9f9f9;
+        }
+        .edit-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .edit-form button {
+            padding: 10px 20px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div v-if="!loggedIn">
+            <h3>Bienvenido a la app</h3>
+            <form @submit.prevent="Login">
+                <fieldset>
+                    <label for="email">Email</label>
+                    <input type="email" v-model="email" placeholder="Escribe aquí" required>
+                </fieldset>
+                <fieldset>
+                    <label for="password">Password</label>
+                    <input type="password" v-model="password" placeholder="Escribe aquí" required>
+                </fieldset>
+                <button type="submit">Iniciar Sesión</button>
+                <p style="color: red;" v-if="errorMessage">{{ errorMessage }}</p>
+            </form>
+        </div>
+        <div v-else class="welcome-page">
+            <h1>Bienvenido a tu cuenta</h1>
+            <table v-if="!editMode">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Nombre de usuario</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <th>Sitio web</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(user, index) in users" :key="user.email">
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.phone }}</td>
+                        <td>{{ user.website }}</td>
+                        <td class="actions">
+                            <button @click="openEditForm(index)">Editar</button>
+                            <button @click="deleteUser(index)">Eliminar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div v-if="editMode" class="edit-form">
+                <h3>Editar Usuario</h3>
+                <form @submit.prevent="updateUser">
+                    <label for="editName">Nombre</label>
+                    <input id="editName" v-model="editUserData.name" placeholder="Nombre" required>
+
+                    <label for="editUsername">Nombre de usuario</label>
+                    <input id="editUsername" v-model="editUserData.username" placeholder="Nombre de usuario" required>
+
+                    <label for="editEmail">Email</label>
+                    <input id="editEmail" v-model="editUserData.email" placeholder="Email" required>
+
+                    <label for="editPhone">Teléfono</label>
+                    <input id="editPhone" v-model="editUserData.phone" placeholder="Teléfono" required>
+
+                    <label for="editWebsite">Sitio web</label>
+                    <input id="editWebsite" v-model="editUserData.website" placeholder="Sitio web" required>
+
+                    <button type="submit">Guardar</button>
+                    <button type="button" @click="cancelEdit">Cancelar</button>
+                </form>
+            </div>
+
+            <button v-if="!editMode" @click="logout">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref, reactive } = Vue;
+
+        createApp({
+            setup() {
+                const email = ref('');
+                const password = ref('');
+                const errorMessage = ref('');
+                const loggedIn = ref(false);
+                const users = ref([]);
+                const editMode = ref(false);
+                const editUserData = reactive({
+                    index: null,
+                    name: '',
+                    username: '',
+                    email: '',
+                    phone: '',
+                    website: ''
+                });
+
+                const Login = () => {
+                    errorMessage.value = '';
+
+                    fetch('users.json')
+                        .then(response => response.json())
+                        .then(data => {
+                            const user = data.find(u => u.email === email.value && u.password === password.value);
+
+                            if (user) {
+                                loggedIn.value = true;
+                                users.value = data;
+                                localStorage.setItem('user', JSON.stringify(user)); 
+                            } else {
+                                errorMessage.value = 'Email o contraseña incorrectos';
+                            }
+                        })
+                        .catch(() => {
+                            errorMessage.value = 'No se pudo iniciar sesión'; 
+                        });
+                };
+
+                const logout = () => {
+                    loggedIn.value = false;
+                    localStorage.removeItem('user');
+                    editMode.value = false;
+                };
+
+                const checkSession = () => {
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    if (user) {
+                        loggedIn.value = true;
+                        fetch('users.json')
+                            .then(response => response.json())
+                            .then(data => {
+                                users.value = data;
+                            });
+                    }
+                };
+
+                const openEditForm = (index) => {
+                    editUserData.index = index;
+                    editUserData.name = users.value[index].name;
+                    editUserData.username = users.value[index].username;
+                    editUserData.email = users.value[index].email;
+                    editUserData.phone = users.value[index].phone;
+                    editUserData.website = users.value[index].website;
+                    editMode.value = true;
+                };
+
+                const updateUser = () => {
+                    const index = editUserData.index;
+                    users.value[index] = {
+                        ...users.value[index],
+                        name: editUserData.name,
+                        username: editUserData.username,
+                        email: editUserData.email,
+                        phone: editUserData.phone,
+                        website: editUserData.website
+                    };
+                    editMode.value = false;
+                };
+
+                const cancelEdit = () => {
+                    editMode.value = false;
+                };
+
+                const deleteUser = (index) => {
+                    if (confirm(`¿Estás seguro de que deseas eliminar a ${users.value[index].name}?`)) {
+                        users.value.splice(index, 1);
+                    }
+                };
+
+                checkSession();
+
+                return {
+                    email,
+                    password,
+                    Login,
+                    logout,
+                    errorMessage,
+                    loggedIn,
+                    users,
+                    editMode,
+                    editUserData,
+                    openEditForm,
+                    updateUser,
+                    cancelEdit,
+                    deleteUser
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
