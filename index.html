@@ -45,6 +45,14 @@
             padding: 10px 20px;
             margin-top: 10px;
         }
+        .buttons {
+            margin: 20px;
+            text-align: center;
+        }
+        .buttons button {
+            padding: 10px 20px;
+            margin: 10px;
+        }
     </style>
 </head>
 <body>
@@ -66,6 +74,10 @@
         </div>
         <div v-else class="welcome-page">
             <h1>Bienvenido a tu cuenta</h1>
+            <div class="buttons">
+                <button v-if="!editMode" @click="openAddForm">Agregar Nuevo Usuario</button>
+                <button v-if="!editMode" @click="logout">Cerrar Sesión</button>
+            </div>
             <table v-if="!editMode">
                 <thead>
                     <tr>
@@ -91,10 +103,10 @@
                     </tr>
                 </tbody>
             </table>
-            
             <div v-if="editMode" class="edit-form">
-                <h3>Editar Usuario</h3>
-                <form @submit.prevent="updateUser">
+                <h3 v-if="isEditMode">Editar Usuario</h3>
+                <h3 v-else>Agregar Nuevo Usuario</h3>
+                <form @submit.prevent="saveUser">
                     <label for="editName">Nombre</label>
                     <input id="editName" v-model="editUserData.name" placeholder="Nombre" required>
 
@@ -110,19 +122,15 @@
                     <label for="editWebsite">Sitio web</label>
                     <input id="editWebsite" v-model="editUserData.website" placeholder="Sitio web" required>
 
-                    <button type="submit">Guardar</button>
+                    <button type="submit">{{ isEditMode ? 'Guardar' : 'Agregar' }}</button>
                     <button type="button" @click="cancelEdit">Cancelar</button>
                 </form>
             </div>
-
-            <button v-if="!editMode" @click="logout">Cerrar Sesión</button>
         </div>
     </div>
-
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script>
         const { createApp, ref, reactive } = Vue;
-
         createApp({
             setup() {
                 const email = ref('');
@@ -131,6 +139,7 @@
                 const loggedIn = ref(false);
                 const users = ref([]);
                 const editMode = ref(false);
+                const isEditMode = ref(false); 
                 const editUserData = reactive({
                     index: null,
                     name: '',
@@ -139,15 +148,12 @@
                     phone: '',
                     website: ''
                 });
-
                 const Login = () => {
                     errorMessage.value = '';
-
                     fetch('users.json')
                         .then(response => response.json())
                         .then(data => {
                             const user = data.find(u => u.email === email.value && u.password === password.value);
-
                             if (user) {
                                 loggedIn.value = true;
                                 users.value = data;
@@ -160,13 +166,11 @@
                             errorMessage.value = 'No se pudo iniciar sesión'; 
                         });
                 };
-
                 const logout = () => {
                     loggedIn.value = false;
                     localStorage.removeItem('user');
                     editMode.value = false;
                 };
-
                 const checkSession = () => {
                     const user = JSON.parse(localStorage.getItem('user'));
                     if (user) {
@@ -178,7 +182,6 @@
                             });
                     }
                 };
-
                 const openEditForm = (index) => {
                     editUserData.index = index;
                     editUserData.name = users.value[index].name;
@@ -187,33 +190,50 @@
                     editUserData.phone = users.value[index].phone;
                     editUserData.website = users.value[index].website;
                     editMode.value = true;
+                    isEditMode.value = true; 
+                };
+                const openAddForm = () => {
+                    editUserData.index = null;
+                    editUserData.name = '';
+                    editUserData.username = '';
+                    editUserData.email = '';
+                    editUserData.phone = '';
+                    editUserData.website = '';
+                    editMode.value = true;
+                    isEditMode.value = false; 
                 };
 
-                const updateUser = () => {
-                    const index = editUserData.index;
-                    users.value[index] = {
-                        ...users.value[index],
-                        name: editUserData.name,
-                        username: editUserData.username,
-                        email: editUserData.email,
-                        phone: editUserData.phone,
-                        website: editUserData.website
-                    };
+                const saveUser = () => {
+                    if (isEditMode.value) {
+                        const index = editUserData.index;
+                        users.value[index] = {
+                            ...users.value[index],
+                            name: editUserData.name,
+                            username: editUserData.username,
+                            email: editUserData.email,
+                            phone: editUserData.phone,
+                            website: editUserData.website
+                        };
+                    } else {
+                        users.value.push({
+                            name: editUserData.name,
+                            username: editUserData.username,
+                            email: editUserData.email,
+                            phone: editUserData.phone,
+                            website: editUserData.website
+                        });
+                    }
                     editMode.value = false;
                 };
-
                 const cancelEdit = () => {
                     editMode.value = false;
                 };
-
                 const deleteUser = (index) => {
                     if (confirm(`¿Estás seguro de que deseas eliminar a ${users.value[index].name}?`)) {
                         users.value.splice(index, 1);
                     }
                 };
-
                 checkSession();
-
                 return {
                     email,
                     password,
@@ -223,9 +243,11 @@
                     loggedIn,
                     users,
                     editMode,
+                    isEditMode,
                     editUserData,
                     openEditForm,
-                    updateUser,
+                    openAddForm,
+                    saveUser,
                     cancelEdit,
                     deleteUser
                 };
